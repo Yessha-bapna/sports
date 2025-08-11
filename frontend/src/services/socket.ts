@@ -6,7 +6,10 @@ class SocketService {
 
   connect(): Socket {
     if (!this.socket) {
-      this.socket = io('http://localhost:5000');
+      this.socket = io('https://sports-jf8d.onrender.com', {
+        transports: ['websocket', 'polling'],
+        withCredentials: false,
+      });
     }
     return this.socket;
   }
