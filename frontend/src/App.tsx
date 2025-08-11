@@ -1,25 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import './styles.css';
-import type { Match, Booking, Venue } from './types';
+import type { Match } from './types';
 import { matchAPI } from './services/api';
 import MatchSetup from './components/MatchSetup';
 import LiveScore from './components/LiveScore';
 import socketService from './services/socket';
-import VenueList from './components/VenueList';
-import VenueAdd from './components/VenueAdd';
-import VenueDetails from './components/VenueDetails';
-import BookingMatchSetup from './components/BookingMatchSetup';
 
 const App: React.FC = () => {
   const [matches, setMatches] = useState<Match[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<'matches' | 'venues' | 'addVenue' | 'venueDetails' | 'bookingSetup'>('venues');
-  const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [selectedVenueForBooking, setSelectedVenueForBooking] = useState<Venue | null>(null);
-  const [liveInitialTab, setLiveInitialTab] = useState<'add' | 'view'>('add');
+  const [view, setView] = useState<'matches'>('matches');
 
   useEffect(() => {
     fetchMatches();
@@ -65,8 +57,6 @@ const App: React.FC = () => {
           <h1 className="header-title">Real-Time Sports Scoring</h1>
           <nav style={{ display: 'flex', gap: 8 }}>
             <button className={`btn ${view === 'matches' ? 'btn-primary' : ''}`} onClick={() => setView('matches')}>Matches</button>
-            <button className={`btn ${view === 'venues' ? 'btn-primary' : ''}`} onClick={() => setView('venues')}>Venues</button>
-            <button className={`btn ${view === 'addVenue' ? 'btn-primary' : ''}`} onClick={() => setView('addVenue')}>Add Venue</button>
           </nav>
         </div>
       </header>
@@ -76,6 +66,11 @@ const App: React.FC = () => {
           <div className="layout">
             {/* Left Column: Match List and Setup */}
             <div className="left-col">
+              {/* Add Match */}
+              <div className="card" style={{ marginBottom: 12 }}>
+                <h2>Create Match</h2>
+                <MatchSetup onMatchCreated={handleMatchCreated} />
+              </div>
               <div className="card">
                 <h2>Matches</h2>
                 {loading && <p className="help">Loading matches...</p>}
@@ -103,7 +98,7 @@ const App: React.FC = () => {
             <div className="right-col">
               {selectedMatch ? (
                 <div className="card">
-                  <LiveScore match={selectedMatch} onMatchComplete={handleMatchComplete} initialTab={liveInitialTab} />
+                  <LiveScore match={selectedMatch} onMatchComplete={handleMatchComplete} />
                 </div>
               ) : (
                 <div className="card empty">
@@ -112,52 +107,6 @@ const App: React.FC = () => {
                 </div>
               )}
             </div>
-          </div>
-        )}
-
-        {view === 'venues' && (
-          <div className="card">
-            <VenueList onViewDetails={(id) => { setSelectedVenueId(id); setView('venueDetails'); }} />
-          </div>
-        )}
-
-        {view === 'addVenue' && (
-          <div className="card">
-            <VenueAdd />
-          </div>
-        )}
-
-        {view === 'venueDetails' && selectedVenueId && (
-          <div className="card">
-            <VenueDetails
-              venueId={selectedVenueId}
-              onBack={() => setView('venues')}
-              onSetupMatch={(booking, venue) => {
-                setSelectedBooking(booking);
-                setSelectedVenueForBooking(venue as any);
-                setView('bookingSetup');
-              }}
-              onOpenMatch={(m: Match, tab: 'add' | 'view') => {
-                setSelectedMatch(m);
-                setLiveInitialTab(tab);
-                setView('matches');
-              }}
-            />
-          </div>
-        )}
-
-        {view === 'bookingSetup' && selectedBooking && selectedVenueForBooking && (
-          <div className="card">
-            <BookingMatchSetup
-              booking={selectedBooking}
-              venue={selectedVenueForBooking}
-              onCancel={() => setView('venueDetails')}
-              onCreated={(m: Match) => {
-                setMatches(prev => [m, ...prev]);
-                setSelectedMatch(m);
-                setView('matches');
-              }}
-            />
           </div>
         )}
       </main>

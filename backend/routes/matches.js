@@ -72,20 +72,23 @@ router.post('/', async (req, res) => {
 router.put('/:id/status', async (req, res) => {
   try {
     const { status } = req.body;
-    const match = await Match.findByIdAndUpdate(
-      req.params.id,
-      { 
-        status,
-        ...(status === 'live' && { startTime: new Date() }),
-        ...(status === 'completed' && { endTime: new Date() })
-      },
-      { new: true }
-    ).populate('umpireId', 'name email');
-    
-    if (!match) {
-      return res.status(404).json({ error: 'Match not found' });
+    const existing = await Match.findById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Match not found' });
+
+    const updates = { status };
+    const now = new Date();
+    if (status === 'live') {
+      updates.startTime = now;
+      const duration = existing.durationMinutes || 30;
+      updates.endTime = new Date(now.getTime() + duration * 60 * 1000);
     }
-    
+    if (status === 'completed') {
+      updates.endTime = now;
+    }
+
+    const match = await Match.findByIdAndUpdate(req.params.id, updates, { new: true })
+      .populate('umpireId', 'name email');
+
     res.json(match);
   } catch (error) {
     res.status(400).json({ error: error.message });

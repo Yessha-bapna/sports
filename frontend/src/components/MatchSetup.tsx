@@ -18,7 +18,8 @@ const MatchSetup: React.FC<MatchSetupProps> = ({ onMatchCreated }) => {
     player1: '',
     player2: '',
     maxSets: 3,
-    pointsToWin: 10
+    pointsToWin: 10,
+    durationMinutes: 30
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +58,7 @@ const MatchSetup: React.FC<MatchSetupProps> = ({ onMatchCreated }) => {
         matchName: formData.matchName,
         sportType: formData.sportType,
         umpireId: formData.umpireId,
+        durationMinutes: parseInt(formData.durationMinutes.toString()),
         ...(formData.sportType === 'cricket' && {
           team1: formData.team1,
           team2: formData.team2,
@@ -84,7 +86,8 @@ const MatchSetup: React.FC<MatchSetupProps> = ({ onMatchCreated }) => {
         player1: '',
         player2: '',
         maxSets: 3,
-        pointsToWin: 10
+        pointsToWin: 10,
+        durationMinutes: 30
       });
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to create match');
@@ -129,6 +132,21 @@ const MatchSetup: React.FC<MatchSetupProps> = ({ onMatchCreated }) => {
             <option value="">Select sport type</option>
             <option value="cricket">Cricket</option>
             <option value="badminton">Badminton</option>
+          </select>
+        </div>
+
+        {/* Duration */}
+        <div>
+          <label className="label">Duration *</label>
+          <select
+            name="durationMinutes"
+            value={formData.durationMinutes}
+            onChange={handleInputChange}
+            className="select"
+            required
+          >
+            <option value={30}>30 minutes</option>
+            <option value={60}>1 hour</option>
           </select>
         </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Match, Score } from '../types';
 import { scoreAPI, matchAPI, bookingAPI } from '../services/api';
 import socketService from '../services/socket';
@@ -20,6 +20,11 @@ const LiveScore: React.FC<LiveScoreProps> = ({ match, onMatchComplete, initialTa
   const [booking, setBooking] = useState<any | null>(null);
   const [tab, setTab] = useState<'add' | 'view'>(initialTab || 'add');
   const [localStatus, setLocalStatus] = useState<'upcoming' | 'live' | 'completed'>(match.status);
+  const [showModal, setShowModal] = useState(false);
+  const [modalText, setModalText] = useState<string>('');
+  const shownSecondInningsRef = useRef<string | null>(null); // matchId once shown
+  const shownWinnerRef = useRef<string | null>(null); // matchId once shown
+  const scoreRef = useRef<Score | null>(null);
 
   useEffect(() => {
     if (initialTab) setTab(initialTab);
@@ -61,6 +66,7 @@ const LiveScore: React.FC<LiveScoreProps> = ({ match, onMatchComplete, initialTa
         setLoading(true);
         const response = await scoreAPI.getByMatchId(match._id);
         setScore(response.data);
+        scoreRef.current = response.data;
         setError(null);
       } catch (err) {
         setError('Failed to fetch score');
@@ -78,7 +84,24 @@ const LiveScore: React.FC<LiveScoreProps> = ({ match, onMatchComplete, initialTa
     socketService.onScoreUpdate((updatedScore: any) => {
       const updatedMatchId = typeof updatedScore.matchId === 'string' ? updatedScore.matchId : updatedScore.matchId?._id;
       if (updatedMatchId === match._id) {
+        // Detect transitions for popups
+        const prev = scoreRef.current;
+        const prevInnings = prev?.cricketScore?.currentInnings;
+        const nextInnings = updatedScore?.cricketScore?.currentInnings;
+        if (prevInnings === 1 && nextInnings === 2 && shownSecondInningsRef.current !== match._id) {
+          setModalText('Second Innings Started');
+          setShowModal(true);
+          shownSecondInningsRef.current = match._id;
+        }
+        if (updatedScore?.isMatchComplete === true && shownWinnerRef.current !== match._id) {
+          const w = updatedScore?.winner ? `Winner: ${updatedScore.winner}` : 'Match Completed';
+          setModalText(w);
+          setShowModal(true);
+          shownWinnerRef.current = match._id;
+          setLocalStatus('completed');
+        }
         setScore(updatedScore);
+        scoreRef.current = updatedScore;
         if (updatedScore.isMatchComplete === true) {
           onMatchComplete(match._id);
         }
@@ -90,6 +113,9 @@ const LiveScore: React.FC<LiveScoreProps> = ({ match, onMatchComplete, initialTa
       setError('A connection error occurred.');
     });
 
+    // Reset modal flags on match change
+    shownSecondInningsRef.current = null;
+    shownWinnerRef.current = null;
     // Cleanup on component unmount or match change
     return () => {
       socketService.offScoreUpdate();
@@ -99,13 +125,19 @@ const LiveScore: React.FC<LiveScoreProps> = ({ match, onMatchComplete, initialTa
 
   const handleScoreUpdate = (updatedScore: Score) => {
     setScore(updatedScore);
+    scoreRef.current = updatedScore;
   };
 
   const handleSetMatchLive = async () => {
     try {
-      await matchAPI.updateStatus(match._id, 'live');
+      const res = await matchAPI.updateStatus(match._id, 'live');
+      const updated = res.data;
       setLocalStatus('live');
       setTab('add');
+      if (updated?.endTime) {
+        const ts = new Date(updated.endTime).getTime();
+        setEndMs(ts);
+      }
       // Ensure we have an end time source (match or booking) and prime countdown immediately
       let endTs = endMs;
       if (!endTs) {
@@ -213,20 +245,30 @@ const LiveScore: React.FC<LiveScoreProps> = ({ match, onMatchComplete, initialTa
     return (
       <div className="grid" style={{ gap: 12 }}>
         <div className="card">
-          <h4 style={{ marginTop: 0 }}>{match.team1 || 'Team 1'}</h4>
-          <div className="row">
-            <div className="pill">Runs: <b>{cs.team1Runs}</b></div>
-            <div className="pill">Wkts: <b>{cs.team1Wickets}</b></div>
-            <div className="pill">Overs: <b>{cs.team1Overs}</b></div>
-          </div>
-        </div>
-        <div className="card">
-          <h4 style={{ marginTop: 0 }}>{match.team2 || 'Team 2'}</h4>
-          <div className="row">
-            <div className="pill">Runs: <b>{cs.team2Runs}</b></div>
-            <div className="pill">Wkts: <b>{cs.team2Wickets}</b></div>
-            <div className="pill">Overs: <b>{cs.team2Overs}</b></div>
-          </div>
+          <table className="table" style={{ width:'100%' }}>
+            <thead>
+              <tr>
+                <th>Team</th>
+                <th>Runs</th>
+                <th>Wickets</th>
+                <th>Overs</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{match.team1 || 'Team 1'}</td>
+                <td>{cs.team1Runs}</td>
+                <td>{cs.team1Wickets}</td>
+                <td>{cs.team1Overs}</td>
+              </tr>
+              <tr>
+                <td>{match.team2 || 'Team 2'}</td>
+                <td>{cs.team2Runs}</td>
+                <td>{cs.team2Wickets}</td>
+                <td>{cs.team2Overs}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
         <div className="card" style={{ background:'#f8f9fb' }}>
           <div className="row" style={{ justifyContent:'space-between' }}>
@@ -319,6 +361,13 @@ const LiveScore: React.FC<LiveScoreProps> = ({ match, onMatchComplete, initialTa
               {match.sportType === 'badminton' && (
                 <BadmintonScoring match={match} score={score} onScoreUpdate={handleScoreUpdate} />
               )}
+              {/* Winner summary below scoring */}
+              <div className="card" style={{ marginTop: 8, background:'#f8f9fb' }}>
+                <div className="row" style={{ justifyContent:'space-between' }}>
+                  <div>Winner</div>
+                  <div style={{ fontWeight:600 }}>{score?.winner || '—'}</div>
+                </div>
+              </div>
             </>
           )}
 
@@ -329,6 +378,17 @@ const LiveScore: React.FC<LiveScoreProps> = ({ match, onMatchComplete, initialTa
             </div>
           )}
         </>
+      )}
+      {showModal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
+          <div className="card" style={{ maxWidth: 420, width:'90%', padding:16, background:'#fff' }}>
+            <h3 style={{ marginTop:0 }}>Notification</h3>
+            <p style={{ margin:'8px 0 16px' }}>{modalText}</p>
+            <div style={{ textAlign:'right' }}>
+              <button className="btn btn-primary" onClick={() => setShowModal(false)}>OK</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

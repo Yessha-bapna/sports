@@ -24,6 +24,7 @@ export interface Match {
   status: 'upcoming' | 'live' | 'completed';
   startTime: string;
   endTime?: string;
+  durationMinutes?: number;
 }
 
 export interface CricketScore {

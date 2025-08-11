@@ -71,6 +71,12 @@ const matchSchema = new mongoose.Schema({
   endTime: {
     type: Date
   }
+  ,
+  durationMinutes: {
+    type: Number,
+    default: 30,
+    min: 1
+  }
 }, {
   timestamps: true
 });
