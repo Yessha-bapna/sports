@@ -9,7 +9,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: "http://localhost:5173", // Vite dev server
+    origin: "*", // Vite dev server
     methods: ["GET", "POST"]
   }
 });
@@ -18,7 +18,9 @@ const io = socketIo(server, {
 app.set('io', io);
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: "*"
+}));
 app.use(express.json());
 
 // MongoDB Connection
